@@ -72,8 +72,8 @@ export class WhereBuilder<Entity> {
     relationNames: NestedRelationsAliased,
     alias: string | undefined
   ): Where {
-    return where.andWhere(
-      new Brackets((qb) => filter.reduce((w, f) => qb.orWhere(this.createBrackets(f, relationNames, alias)), qb))
+    return where.andOr(
+      new Brackets((qb) => filter.reduce((w, f) => qb.orOr(this.createBrackets(f, relationNames, alias)), qb))
     )
   }
 
