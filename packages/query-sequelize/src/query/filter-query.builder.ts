@@ -65,7 +65,7 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
    * @param query - the query to apply.
    */
   public findOptions(query: Query<Entity>): FindOptions {
-    let opts: FindOptions = this.applyAssociationIncludes({ subQuery: false }, query.filter)
+    let opts: FindOptions = this.applyAssociationIncludes({ subQuery: false }, query.filter, query.sorting)
     opts = this.applyFilter(opts, query.filter)
     opts = this.applySorting(opts, query.sorting)
     opts = this.applyPaging(opts, query.paging)
@@ -79,7 +79,7 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
    * @param query - the query to apply.
    */
   public findByIdOptions(pk: string | number | (string | number)[], query: Query<Entity>): FindOptions {
-    let opts: FindOptions = this.applyAssociationIncludes({ subQuery: false }, query.filter)
+    let opts: FindOptions = this.applyAssociationIncludes({ subQuery: false }, query.filter, query.sorting)
     opts = this.applyFilter(opts, {
       ...(query.filter ?? ({} as Filter<Entity>)),
       [this.model.primaryKeyAttribute]: { [Array.isArray(pk) ? 'in' : 'eq']: pk }
@@ -115,7 +115,7 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
   }
 
   public countOptions(query: Query<Entity>): CountOptions<Entity> {
-    let opts: CountOptions = this.applyAssociationIncludes({}, query.filter)
+    let opts: CountOptions = this.applyAssociationIncludes({}, query.filter, query.sorting)
     opts.distinct = true
     opts = this.applyFilter(opts, query.filter)
     return opts as CountOptions<Entity>
@@ -191,7 +191,47 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
     }
     // eslint-disable-next-line no-param-reassign
     qb.order = sorts.map(({ field, direction, nulls }): OrderItem => {
-      const col = `${field as string}`
+      const fieldStr = `${field as string}`
+
+      // Check if the field contains __ delimiter for nested relation sorting
+      if (fieldStr.includes('__')) {
+        const parts = fieldStr.split('__')
+        const relationPath = parts.slice(0, -1)
+        const finalField = parts[parts.length - 1]
+
+        // Build the nested relation path for Sequelize
+        // Sequelize uses arrays like [{model: ModelClass}, {model: ModelClass}, 'field', 'ASC']
+        const orderPath: (Association | string)[] = []
+
+        // Navigate through relations
+        let currentModel: ModelCtor<Model> = this.model as ModelCtor<Model>
+        for (const relationName of relationPath) {
+          const association = currentModel.associations[relationName]
+          if (association) {
+            orderPath.push(association)
+            currentModel = association.target as ModelCtor<Model>
+          } else {
+            // If relation not found, fall back to simple field sorting
+            const dir: string[] = [direction]
+            if (nulls) {
+              dir.push(nulls)
+            }
+            return [fieldStr, dir.join(' ')]
+          }
+        }
+
+        // Add the final field and direction
+        orderPath.push(finalField)
+        const dir: string[] = [direction]
+        if (nulls) {
+          dir.push(nulls)
+        }
+        orderPath.push(dir.join(' '))
+
+        return orderPath as OrderItem
+      }
+
+      const col = fieldStr
       const dir: string[] = [direction]
       if (nulls) {
         dir.push(nulls)
@@ -234,12 +274,13 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
 
   private applyAssociationIncludes<Opts extends FindOptions<Entity> | CountOptions<Entity>>(
     findOpts: Opts,
-    filter?: Filter<Entity>
+    filter?: Filter<Entity>,
+    sorting?: SortField<Entity>[]
   ): Opts {
-    if (!filter) {
+    const referencedRelations = this.getReferencedRelations(filter, sorting)
+    if (referencedRelations.size === 0) {
       return findOpts
     }
-    const referencedRelations = this.getReferencedRelations(filter)
     return [...referencedRelations.values()].reduce((find, association) => {
       const { include = [] } = find
       // eslint-disable-next-line no-param-reassign
@@ -248,11 +289,32 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
     }, findOpts)
   }
 
-  private getReferencedRelations(filter: Filter<Entity>): Map<string, Association> {
+  private getReferencedRelations(filter?: Filter<Entity>, sorting?: SortField<Entity>[]): Map<string, Association> {
     const { relationNames } = this
-    const referencedFields = getFilterFields(filter)
-    const referencedRelations = referencedFields.filter((f) => relationNames.includes(f))
-    return referencedRelations.reduce((map, r) => map.set(r, this.model.associations[r]), new Map<string, Association>())
+    const referencedRelationsMap = new Map<string, Association>()
+
+    // Get relations from filter
+    if (filter) {
+      const referencedFields = getFilterFields(filter)
+      const referencedRelations = referencedFields.filter((f) => relationNames.includes(f))
+      referencedRelations.forEach((r) => referencedRelationsMap.set(r, this.model.associations[r]))
+    }
+
+    // Get relations from sorting fields using __ delimiter
+    if (sorting) {
+      sorting.forEach(({ field }) => {
+        const fieldStr = `${field as string}`
+        if (fieldStr.includes('__')) {
+          const parts = fieldStr.split('__')
+          const firstRelation = parts[0]
+          if (relationNames.includes(firstRelation) && !referencedRelationsMap.has(firstRelation)) {
+            referencedRelationsMap.set(firstRelation, this.model.associations[firstRelation])
+          }
+        }
+      })
+    }
+
+    return referencedRelationsMap
   }
 
   private get relationNames(): string[] {

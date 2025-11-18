@@ -92,7 +92,12 @@ export class FilterQueryBuilder<Entity> {
       return undefined
     }
     return sorts.reduce((sort: TypegooseSort, sortField: SortField<Entity>) => {
-      const field = getSchemaKey(sortField.field.toString())
+      const fieldStr = sortField.field.toString()
+
+      // Check if the field contains __ delimiter for nested relation sorting
+      // Convert __ to . for Mongoose/Typegoose dot notation
+      const field = fieldStr.includes('__') ? getSchemaKey(fieldStr.replace(/__/g, '.')) : getSchemaKey(fieldStr)
+
       const direction = TYPEGOOSE_SORT_DIRECTION[sortField.direction]
       return { ...sort, [field]: direction }
     }, {})
