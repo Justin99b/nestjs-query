@@ -47,7 +47,6 @@ export class KeysetPagerStrategy<DTO> implements PagerStrategy<DTO> {
       paging.limit += 1
     }
     const { payload } = opts
-    // Add 1 to the limit so we will fetch an additional node with the current node
     const sorting = this.getSortFields(query, opts)
     const filter = mergeFilter(query.filter ?? {}, this.createFieldsFilter(sorting, payload))
     const createdQuery = { ...query, filter, sorting, paging }
@@ -110,12 +109,20 @@ export class KeysetPagerStrategy<DTO> implements PagerStrategy<DTO> {
       const subFilter = {
         and: [...equalities, { [keySetField.field]: { [isAsc ? 'gt' : 'lt']: keySetField.value } }]
       } as Filter<DTO>
-      equalities.push({ [keySetField.field]: { eq: keySetField.value } } as Filter<DTO>)
+      if (keySetField.value === null) {
+        equalities.push({ [keySetField.field]: { is: null } } as Filter<DTO>)
+      } else {
+        equalities.push({ [keySetField.field]: { eq: keySetField.value } } as Filter<DTO>)
+      }
       return [...dtoFilters, subFilter]
     }, [] as Filter<DTO>[])
     return { or: oredFilter } as Filter<DTO>
   }
 
+  /**
+   * @description
+   * Strip the default sorting criteria if it is set by the client.
+   */
   private getSortFields(query: Query<DTO>, opts: KeySetPagingOpts<DTO>): SortField<DTO>[] {
     const { sorting = [] } = query
     const defaultSort = opts.defaultSort.filter((dsf) => !sorting.some((sf) => dsf.field === sf.field))
