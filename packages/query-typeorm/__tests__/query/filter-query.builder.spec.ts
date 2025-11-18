@@ -485,6 +485,35 @@ describe('FilterQueryBuilder', (): void => {
         )
         verify(mockWhereBuilder.build(anything(), anything(), {}, 'TestEntity')).never()
       })
+
+      it('should sort by nested relation field using __ delimiter', () => {
+        const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
+        expectSelectSQLSnapshot(
+          { sorting: [{ field: 'oneTestRelation__relationName' as any, direction: SortDirection.ASC }] },
+          instance(mockWhereBuilder)
+        )
+      })
+
+      it('should sort by deeply nested relation field using __ delimiter', () => {
+        const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
+        expectSelectSQLSnapshot(
+          { sorting: [{ field: 'oneTestRelation__relationOfTestRelation__testRelationId' as any, direction: SortDirection.ASC }] },
+          instance(mockWhereBuilder)
+        )
+      })
+
+      it('should combine regular sorting with nested relation sorting', () => {
+        const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
+        expectSelectSQLSnapshot(
+          {
+            sorting: [
+              { field: 'numberType', direction: SortDirection.ASC },
+              { field: 'oneTestRelation__relationName' as any, direction: SortDirection.DESC }
+            ]
+          },
+          instance(mockWhereBuilder)
+        )
+      })
     })
 
     describe('with relation', () => {

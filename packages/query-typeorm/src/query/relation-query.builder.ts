@@ -94,32 +94,36 @@ export class RelationQueryBuilder<Entity, Relation> {
   public select(entity: Entity, query: Query<Relation>, withDeleted?: boolean): SelectQueryBuilder<Relation> {
     const hasRelations = this.filterQueryBuilder.filterHasRelations(query.filter)
 
+    const relationsMap = this.filterQueryBuilder.getReferencedRelationsWithAliasRecursive(
+      this.relationRepo.metadata,
+      query.filter,
+      [],
+      query.sorting
+    )
+
     let relationBuilder = this.createRelationQueryBuilder(entity)
-    relationBuilder = hasRelations
-      ? this.filterQueryBuilder.applyRelationJoinsRecursive(
-          relationBuilder,
-          this.filterQueryBuilder.getReferencedRelationsWithAliasRecursive(this.relationRepo.metadata, query.filter)
-        )
-      : relationBuilder
+    relationBuilder = hasRelations ? this.filterQueryBuilder.applyRelationJoinsRecursive(relationBuilder, relationsMap) : relationBuilder
 
     relationBuilder = this.filterQueryBuilder.applyFilter(relationBuilder, query.filter, relationBuilder.alias)
     relationBuilder = this.filterQueryBuilder.applyPaging(relationBuilder, query.paging)
     if (withDeleted) relationBuilder = relationBuilder.withDeleted()
 
-    return this.filterQueryBuilder.applySorting(relationBuilder, query.sorting, relationBuilder.alias)
+    return this.filterQueryBuilder.applySorting(relationBuilder, query.sorting, relationBuilder.alias, relationsMap)
   }
 
   public batchSelect(entities: Entity[], query: Query<Relation>, withDeleted?: boolean): SelectQueryBuilder<Relation> {
     let qb = this.relationRepo.createQueryBuilder(this.relationMeta.fromAlias)
 
     qb.withDeleted()
-    qb = this.filterQueryBuilder.applyRelationJoinsRecursive(
-      qb,
-      this.filterQueryBuilder.getReferencedRelationsWithAliasRecursive(this.relationRepo.metadata, query.filter, query.relations),
-      query.relations
+    const relationsMap = this.filterQueryBuilder.getReferencedRelationsWithAliasRecursive(
+      this.relationRepo.metadata,
+      query.filter,
+      query.relations,
+      query.sorting
     )
+    qb = this.filterQueryBuilder.applyRelationJoinsRecursive(qb, relationsMap, query.relations)
     qb = this.filterQueryBuilder.applyFilter(qb, query.filter, qb.alias)
-    qb = this.filterQueryBuilder.applySorting(qb, query.sorting, qb.alias)
+    qb = this.filterQueryBuilder.applySorting(qb, query.sorting, qb.alias, relationsMap)
     qb = this.filterQueryBuilder.applyPaging(qb, query.paging)
 
     if (this.relationRepo.metadata.deleteDateColumn?.propertyName && !withDeleted) {

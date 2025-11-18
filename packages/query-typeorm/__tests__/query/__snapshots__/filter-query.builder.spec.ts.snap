@@ -419,6 +419,59 @@ ORDER BY
   "TestEntity"."date_type" DESC NULLS LAST"
 `;
 
+exports[`FilterQueryBuilder #select with sorting should combine regular sorting with nested relation sorting 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "oneTestRelation" ON "oneTestRelation"."test_relation_pk" = "TestEntity"."oneTestRelationTestRelationPk"
+ORDER BY
+  "TestEntity"."number_type" ASC,
+  "oneTestRelation"."relation_name" DESC"
+`;
+
+exports[`FilterQueryBuilder #select with sorting should sort by deeply nested relation field using __ delimiter 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "oneTestRelation" ON "oneTestRelation"."test_relation_pk" = "TestEntity"."oneTestRelationTestRelationPk"
+  LEFT JOIN "relation_of_test_relation_entity" "relationOfTestRelation" ON "relationOfTestRelation"."test_relation_pk" = "oneTestRelation"."uni_directional_relation_test_entity_id"
+ORDER BY
+  "relationOfTestRelation"."test_relation_id" ASC"
+`;
+
+exports[`FilterQueryBuilder #select with sorting should sort by nested relation field using __ delimiter 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "oneTestRelation" ON "oneTestRelation"."test_relation_pk" = "TestEntity"."oneTestRelationTestRelationPk"
+ORDER BY
+  "oneTestRelation"."relation_name" ASC"
+`;
+
 exports[`FilterQueryBuilder #softDelete with filter should call whereBuilder#build if there is a filter 1`] = `
 "UPDATE "test_soft_delete_entity"
 SET
